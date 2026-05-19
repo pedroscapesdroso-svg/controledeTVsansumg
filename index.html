@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Controle Samsung Protegido</title>
+    <title>Controle Samsung SSL</title>
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -92,11 +92,9 @@
         <button onclick="enviar('KEY_HOME')" style="grid-column: span 2; background-color: #0288d1;">Home</button>
     </div>
 
-    <div id="errorMsg" class="status-error">Acesso Negado: Você não está na rede Wi-Fi correta!</div>
+    <div id="errorMsg" class="status-error">Acesso Negado ou Falha de Conexão SSL!</div>
 
     <script>
-        // CONFIGURAÇÃO DE SEGURANÇA: 
-        // Digite abaixo os primeiros números do IP da sua rede doméstica (geralmente '192.168.15.' ou '192.168.1.')
         const PADRAO_IP_CASA = '192.168.15.'; 
 
         if(localStorage.getItem('samsung_tv_ip')) {
@@ -112,21 +110,23 @@
             const tvIp = document.getElementById('tvIp').value;
             const errorMsg = document.getElementById('errorMsg');
             
-            // TRAVA DE SEGURANÇA: Valida se o IP da TV inserido pertence à rede local de casa
             if (!tvIp.startsWith(PADRAO_IP_CASA)) {
+                errorMsg.innerText = "Acesso Negado: Você não está na rede Wi-Fi correta!";
                 errorMsg.style.display = 'block';
-                return; // Corta a execução aqui mesmo e não envia nada
+                return;
             }
             
             errorMsg.style.display = 'none';
 
-            const appNameBase64 = btoa("ControleWebProtegido");
-            const url = `ws://${tvIp}:8001/api/v2/channels/samsung.remote.control?name=${appNameBase64}`;
+            const appNameBase64 = btoa("ControleWebSSL");
+            
+            // ALTERAÇÃO AQUI: Mudamos para wss:// (WebSocket Seguro) e porta 8002
+            const url = `wss://${tvIp}:8002/api/v2/channels/samsung.remote.control?name=${appNameBase64}`;
             
             const ws = new WebSocket(url);
 
             ws.onopen = () => {
-                console.log('Conectado à TV... enviando comando');
+                console.log('Conectado via canal seguro... enviando comando');
             };
 
             ws.onmessage = (event) => {
@@ -147,7 +147,9 @@
             };
 
             ws.onerror = (err) => {
-                alert('Erro ao conectar na TV. Verifique se o celular está no mesmo Wi-Fi!');
+                console.error(err);
+                errorMsg.innerText = "Erro SSL: Se for a primeira vez, digite https://" + tvIp + ":8002 no seu navegador e aceite o certificado de segurança da TV.";
+                errorMsg.style.display = 'block';
             };
         }
     </script>
