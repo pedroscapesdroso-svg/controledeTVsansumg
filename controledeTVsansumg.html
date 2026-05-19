@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Controle Samsung Protegido</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Controle TV">
+
+    <style>
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+        .config-box {
+            margin-bottom: 20px;
+            background-color: #1e1e1e;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .config-box input {
+            padding: 8px;
+            border-radius: 5px;
+            border: none;
+            text-align: center;
+            font-size: 1rem;
+            width: 150px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+            gap: 20px;
+            justify-content: center;
+        }
+        button {
+            background-color: #2a2a2a;
+            border: none;
+            color: white;
+            padding: 20px;
+            font-size: 1.2rem;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        button:active {
+            background-color: #444444;
+            transform: scale(0.95);
+        }
+        .btn-power { background-color: #d32f2f; grid-column: span 3; }
+        .blank { background: transparent; box-shadow: none; pointer-events: none; }
+        .status-error { color: #ff3333; margin-top: 15px; font-weight: bold; text-align: center; display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="config-box">
+        <label for="tvIp">IP da TV: </label>
+        <input type="text" id="tvIp" value="192.168.15.101" onchange="salvarIP()">
+    </div>
+
+    <div class="container">
+        <button class="btn-power" onclick="enviar('KEY_POWER')">Ligar/Desligar</button>
+
+        <button onclick="enviar('KEY_VOLUP')">Vol +</button>
+        <button onclick="enviar('KEY_MUTE')">Mute</button>
+        <button onclick="enviar('KEY_VOLDOWN')">Vol -</button>
+
+        <button class="blank"></button>
+        <button onclick="enviar('KEY_UP')">▲</button>
+        <button class="blank"></button>
+
+        <button onclick="enviar('KEY_LEFT')">◀</button>
+        <button onclick="enviar('KEY_ENTER')">OK</button>
+        <button onclick="enviar('KEY_RIGHT')">▶</button>
+
+        <button class="blank"></button>
+        <button onclick="enviar('KEY_DOWN')">▼</button>
+        <button class="blank"></button>
+
+        <button onclick="enviar('KEY_RETURN')">Voltar</button>
+        <button onclick="enviar('KEY_HOME')" style="grid-column: span 2; background-color: #0288d1;">Home</button>
+    </div>
+
+    <div id="errorMsg" class="status-error">Acesso Negado: Você não está na rede Wi-Fi correta!</div>
+
+    <script>
+        // CONFIGURAÇÃO DE SEGURANÇA: 
+        // Digite abaixo os primeiros números do IP da sua rede doméstica (geralmente '192.168.15.' ou '192.168.1.')
+        const PADRAO_IP_CASA = '192.168.15.'; 
+
+        if(localStorage.getItem('samsung_tv_ip')) {
+            document.getElementById('tvIp').value = localStorage.getItem('samsung_tv_ip');
+        }
+
+        function salvarIP() {
+            const ip = document.getElementById('tvIp').value;
+            localStorage.setItem('samsung_tv_ip', ip);
+        }
+
+        function enviar(tecla) {
+            const tvIp = document.getElementById('tvIp').value;
+            const errorMsg = document.getElementById('errorMsg');
+            
+            // TRAVA DE SEGURANÇA: Valida se o IP da TV inserido pertence à rede local de casa
+            if (!tvIp.startsWith(PADRAO_IP_CASA)) {
+                errorMsg.style.display = 'block';
+                return; // Corta a execução aqui mesmo e não envia nada
+            }
+            
+            errorMsg.style.display = 'none';
+
+            const appNameBase64 = btoa("ControleWebProtegido");
+            const url = `ws://${tvIp}:8001/api/v2/channels/samsung.remote.control?name=${appNameBase64}`;
+            
+            const ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                console.log('Conectado à TV... enviando comando');
+            };
+
+            ws.onmessage = (event) => {
+                const response = JSON.parse(event.data);
+                if (response.event === 'ms.channel.connect') {
+                    const payload = {
+                        method: "ms.remote.control",
+                        params: {
+                            Cmd: "Click",
+                            DataOfCmd: tecla,
+                            Option: "false",
+                            TypeOfCmd: "遙控器鍵值"
+                        }
+                    };
+                    ws.send(JSON.stringify(payload));
+                    setTimeout(() => ws.close(), 200);
+                }
+            };
+
+            ws.onerror = (err) => {
+                alert('Erro ao conectar na TV. Verifique se o celular está no mesmo Wi-Fi!');
+            };
+        }
+    </script>
+</body>
+</html>
